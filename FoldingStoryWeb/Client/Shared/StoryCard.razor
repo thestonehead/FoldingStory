@@ -1,0 +1,42 @@
+﻿@namespace FoldingStoryWeb.Client.Shared
+@using FoldingStoryWeb.Shared;
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="card storyCard border">
+    <div class="card-header">
+        <a class="nav-link" href="@("/story/" + CodeHelper.IntToString(Story.Id.Value))">
+            @Story.Title
+        </a>
+        <span class="float-right">@Story.SnippetCount snippets</span>
+    </div>
+    <div class="card-body">
+        @if (firstSnippet != null)
+        {
+            @firstSnippet.Text
+        }
+        else
+        {
+            @: A riveting tale filled with intrigue and drama.
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public StoryDto Story { get; set; } = new StoryDto();
+
+    private SnippetDto? firstSnippet;
+
+    protected override async Task OnInitializedAsync()
+    {
+        firstSnippet = (await Http.GetFromJsonAsync<IEnumerable<SnippetDto>>($"/api/snippets/byStory/{Story.Id}?head=1"))?.FirstOrDefault();
+    }
+}
+
+
+<style type="text/css">
+    .storyCard {
+        margin-top: 10px;
+    }
+</style>

@@ -1,0 +1,46 @@
+﻿@page "/"
+@using FoldingStoryWeb.Shared
+@using FoldingStoryWeb.Client.Shared
+@inject HttpClient Http
+
+<PageTitle>Folding stories</PageTitle>
+
+<div class="container border shading introPanel">
+    Greetings, traveller. This is a place of creativity and collaboration. Leave your burdens at the door and join this community of writers.
+    <br /> Here you can create a new story with others, whether public or your friends and weave together fantastic adventures which could surprise even you.
+    <br /> You can also read others' submissions should you choose to do so.
+    <br /><br />
+    <a href="/newStory">Click here</a> to start a new tale, or click on one of the existing ones to read them.
+</div>
+
+<div class="container border shading storiesPanel padding-small">
+    <div style="text-align: center"><h3>Read a story</h3></div>
+    @foreach (var story in stories)
+    {
+        <StoryCard Story="@story" />
+
+    }
+</div>
+
+
+@code {
+    private IEnumerable<StoryDto> stories = new StoryDto[0];
+
+    protected override async Task OnInitializedAsync()
+    {
+        stories = await Http.GetFromJsonAsync<IEnumerable<StoryDto>>("/api/stories") ?? new StoryDto[0];
+
+
+    }
+}
+
+<style type="text/css">
+    .introPanel {
+        padding: 10px;
+    }
+
+    .storiesPanel {
+        margin-top: 10px;
+        padding: 10px;
+    }
+</style>

@@ -1,0 +1,181 @@
+﻿@page "/story/{Code}"
+@using FoldingStoryWeb.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IJSRuntime JS
+@inject HttpClient Http
+@*@inject AuthenticationStateProvider authenticationStateProvider*@
+
+<h3><a href="/story/@story.Title">@story.Title</a></h3>
+
+@if (showLoadMorebutton)
+{
+    <div class="card" @onclick="LoadMoreSnippets">
+        <div class="card-body" style="text-align:center">
+            Load more...
+        </div>
+    </div>
+}
+@foreach (var snippet in snippets)
+{
+    bool isLastOne = false;
+    if (snippets.Last() == snippet)
+    {
+        isLastOne = true;
+    }
+    <div class="card @(isLastOne? "lastSnippet": "" )">
+        <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">@snippet.CreatedAt by @snippet.Username</h6>
+            <p class="card-text">@snippet.Text</p>
+        </div>
+    </div>
+}
+
+
+<div class="card">
+    <div class="card-body">
+        <AuthorizeView>
+            <Authorized>
+                @if (story.TimeLimit.HasValue)
+                {
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="@limitTimerProgress" aria-valuemin="0" aria-valuemax="100" style="width: 75%"></div>
+                    </div>
+                }
+                <EditForm Context="newSnippetForm" OnValidSubmit="OnValidSubmit" Model="newSnippet">
+                    <div><label>Your story snippet:</label></div>
+                    <InputTextArea @bind-Value="newSnippet.Text" maxlength="@story.CharacterLimit" id="newSnippetTxt" />
+                    <div>
+                        @*<span >@newSnippet?.Text?.Count() characters</span>*@
+                        <span id="newSnippetCharCountTxt">0 </span>
+                        <span> characters</span>
+
+                        <span class="float-right">by @newSnippet.Username</span>
+                    </div>
+                    <div>
+                        <button type="submit" class="float-right">Submit</button>
+                    </div>
+                </EditForm>
+
+            </Authorized>
+            <NotAuthorized>
+                <div>You are not authenticated. Please log in using one of these:</div>
+                <div></div>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Code { get; set; }
+    StoryDto? story;
+    List<SnippetDto>? snippets = new List<SnippetDto>(3);
+
+    SnippetDto newSnippet = new SnippetDto();
+
+    [CascadingParameter] private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    public string CharacterCount { get; set; }
+    private Timer limitTimer;
+    private TimeSpan limitTimerElapsed;
+    private int limitTimerProgress = 100;
+
+    private bool showLoadMorebutton = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        //  var coasdgasdgde = CodeHelper.IntToString(100001);
+
+        var storyId = CodeHelper.StringToInt(Code);
+        try
+        {
+            story = await Http.GetFromJsonAsync<StoryDto>($"/api/stories/{storyId}");
+
+            if (story == null)
+            {
+                return; //TODO: Show 404
+            }
+
+            snippets = (await Http.GetFromJsonAsync<IEnumerable<SnippetDto>>($"/api/snippets/byStory/{storyId}?tail=1"))?.ToList();
+
+            story.TimeLimit = TimeSpan.FromSeconds(30);
+            if (story.TimeLimit.HasValue)
+            {
+                limitTimerElapsed = story.TimeLimit.Value;
+                limitTimer = new Timer((state) =>
+                {
+                    limitTimerElapsed.Add(TimeSpan.FromSeconds(-1));
+                    limitTimerProgress = (int)((limitTimerElapsed.TotalSeconds / story.TimeLimit.Value.TotalSeconds) * 100);
+                    if (limitTimerProgress == 0)
+                        limitTimer.Dispose();
+                }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+            }
+
+            showLoadMorebutton = snippets.Any(t => t.Id == 1);
+        }
+        catch (Exception ex)
+        {
+            var a = 3;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var anotherauthstate = await authenticationStateTask;
+        newSnippet.Username = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.Name)?.Value;
+        newSnippet.UserId = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("SetupCharacterCount");
+    }
+
+    public async Task OnValidSubmit()
+    {
+        // Send snippet
+        newSnippet.CreatedAt = DateTime.UtcNow;
+        newSnippet.StoryId = story.Id;
+
+        snippets.Add(newSnippet);
+        await Http.PostAsJsonAsync<SnippetDto>($"/api/snippets?lastId={snippets.First().Id}", newSnippet);
+        newSnippet = new SnippetDto();
+        this.StateHasChanged();
+    }
+
+    public async Task LoadMoreSnippets()
+    {
+        var moreSnippets = (await Http.GetFromJsonAsync<IEnumerable<SnippetDto>>($"/api/snippets/byStory/{story.Id}?tail=10&skip={snippets.Count}"))?.ToList();
+        snippets.InsertRange(0, moreSnippets);
+        showLoadMorebutton = moreSnippets.Any(t => t.Id == 1);
+    }
+}
+
+
+<style type="text/css">
+    @@keyframes progress-bar-stripes {
+        0% {
+            background-position-x: $progress-height;
+        }
+    }
+
+
+    .card {
+        margin-top: 1em;
+        opacity: 0.7;
+    }
+
+    .lastSnippet {
+        opacity: 1;
+    }
+
+    textarea {
+        width: 100%;
+        height: 200px;
+    }
+
+    .float-right {
+        float: right;
+    }
+</style>

@@ -1,0 +1,100 @@
+﻿@page "/newStory"
+@using FoldingStoryWeb.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+@inject HttpClient Http
+@inject NavigationManager Navigation
+<h3>Start a new story</h3>
+
+<div class="container shadow border">
+    <EditForm class="form" Model="@story" OnValidSubmit="OnValidSubmit">
+        <div class="form-group">
+            <label for="title">Title:</label>
+            <input type="text" placeholder="An interesting title" id="title" @bind-value="story.Title" />
+        </div>
+        <div class="form-group">
+            <label for="characterLimit" class="paper-check">
+                <input type="checkbox" name="characterLimit" id="characterLimitOn" value="1"> <span>Character limit:</span>
+            </label>
+            <InputNumber @bind-Value="story.CharacterLimit" id="characterLimit" max="1800" min="142" />
+        </div>
+        <div class="form-group">
+            <label for="sequenceLimit" class="paper-check">
+                <input type="checkbox" name="sequenceLimit" id="sequenceLimitOn" value="1"> <span>Sequence limit:</span>
+            </label>
+            <InputNumber @bind-Value="story.SequenceLimit" id="sequenceLimit" max="10" min="1" />
+        </div>
+        <div class="form-group">
+            <label for="type">Select availability:</label>
+            <InputSelect @bind-Value="story.Type">
+                @foreach (var item in Enum.GetValues<StoryType>())
+                {
+                    <option value="@item">@(Enum.GetName<StoryType>(item))</option>
+                }
+            </InputSelect>
+        </div>
+
+        <InputTextArea @bind-Value="firstSnippetText" maxlength="@story.CharacterLimit" id="newSnippetTxt" />
+        <div>
+            @*<span >@newSnippet?.Text?.Count() characters</span>*@
+            <span id="newSnippetCharCountTxt">0 </span>
+            <span> characters</span>
+
+            <span class="float-right">by @username</span>
+        </div>
+
+        <div>
+            <button type="submit">Create</button>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    public StoryDto story = new StoryDto();
+    public string firstSnippetText = "";
+    public string username = "";
+    public string userId = "";
+    [CascadingParameter] private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+
+    protected override Task OnInitializedAsync()
+    {
+        story.CharacterLimit = 1800;
+        story.SequenceLimit = 1;
+        story.Type = StoryType.Public;
+
+        return base.OnInitializedAsync();
+    }
+
+    private async Task OnValidSubmit()
+    {
+        var result = await Http.PostAsJsonAsync<StoryDto>("/api/stories", story);
+        var a = 3;
+
+        var createdStory = await result.Content.ReadFromJsonAsync<StoryDto>();
+        if (createdStory?.Id == null)
+        {
+            //There was a problem
+            return;
+        }
+
+
+        await Http.PostAsJsonAsync<SnippetDto>("/api/snippets", new SnippetDto()
+            {
+                Id = 1,
+                StoryId = createdStory.Id.Value,
+                Text = firstSnippetText,
+                UserId = userId,
+                Username = username
+            });
+
+        Navigation.NavigateTo("/story/" + CodeHelper.IntToString(createdStory.Id.Value));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var anotherauthstate = await authenticationStateTask;
+        username = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.Name)?.Value;
+        userId = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        StateHasChanged();
+    }
+}
