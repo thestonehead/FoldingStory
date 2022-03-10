@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using FoldingStoryWeb.Server.DAL;
 using FoldingStoryWeb.Shared;
+using FoldingStoryWeb.Server.Infrastructure;
 
 namespace FoldingStoryWeb.Server.Controllers
 {
@@ -111,8 +112,8 @@ namespace FoldingStoryWeb.Server.Controllers
         [HttpPost]
         public async Task<ActionResult<Snippet>> PostSnippet(SnippetDto snippet, [FromQuery]int lastId)
         {
-            var username = User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.Name)?.Value;
-            var userId = User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var username = this.GetUsername();
+            var userId = this.GetUserId();
 
             if (username == null || snippet.Username != username)
                 return BadRequest("Username is not valid.");
@@ -128,13 +129,16 @@ namespace FoldingStoryWeb.Server.Controllers
             if (story.SequenceLimit.HasValue && story.Snippets.OrderByDescending(t => t.Id).Take(story.SequenceLimit.Value).Any(t => t.UserId == snippet.UserId))
                 return BadRequest("Snippet posted by the same user too soon after previous snippet from the same user.");
 
-            var maxLastId = _context.Snippets.Where(t => t.StoryId == story.Id).Max(t => t.Id);
+            var lastSnippet = await _context.Snippets.Where(t => t.StoryId == story.Id).OrderByDescending(t => t.Id).FirstOrDefaultAsync();
+
+            var maxLastId = lastSnippet?.Id ?? 0;
 
             if (maxLastId != lastId)
                 return Conflict("Someone posted a snippet to the story before you.");
 
             var dbSnippet = new Snippet();
             dbSnippet.FromDto(snippet);
+            dbSnippet.Id = maxLastId + 1;
             _context.Snippets.Add(dbSnippet);
             await _context.SaveChangesAsync();
 

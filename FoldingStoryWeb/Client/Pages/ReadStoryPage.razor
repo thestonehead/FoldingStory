@@ -1,0 +1,48 @@
+﻿@page "/story/read/{Code}"
+@using FoldingStoryWeb.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+@if (story != null)
+{
+
+    <h3><a href="/story/@story.Title">@story.Title</a></h3>
+
+    <div class="container border shading padding-small">
+        @foreach (var snippet in snippets)
+        {
+            <p popover-right="@snippet.Username @@ @snippet.CreatedAt">@snippet.Text</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Code { get; set; }
+    StoryDto? story;
+    List<SnippetDto> snippets = new List<SnippetDto>(3);
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var storyId = CodeHelper.StringToInt(Code);
+        try
+        {
+            story = await Http.GetFromJsonAsync<StoryDto>($"/api/stories/{storyId}");
+
+            if (story == null)
+            {
+                return; //TODO: Show 404
+            }
+
+            snippets = (await Http.GetFromJsonAsync<IEnumerable<SnippetDto>>($"/api/snippets/byStory/{storyId}"))?.OrderBy(s => s.Id).ToList();
+
+
+        }
+        catch (Exception ex)
+        {
+            var a = 3;
+        }
+    }
+}

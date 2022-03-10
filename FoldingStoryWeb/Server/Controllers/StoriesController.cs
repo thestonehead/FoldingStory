@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FoldingStoryWeb.Server.DAL;
+using FoldingStoryWeb.Server.Infrastructure;
 using FoldingStoryWeb.Shared;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,18 +17,46 @@ namespace FoldingStoryWeb.Server.Controllers
     [ApiController]
     public class StoriesController : ControllerBase
     {
-        private readonly MainDbContext _context;
+        private readonly MainDbContext context;
 
         public StoriesController(MainDbContext context)
         {
-            _context = context;
+            this.context = context;
         }
 
         // GET: api/Stories
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<StoryDto>>> GetStories()
+        public async Task<ActionResult<IEnumerable<StoryDto>>> GetStories(StoryFilter storyFilter = StoryFilter.Public)
         {
-            return await _context.Stories.Select(t=> new StoryDto()
+            var userId = this.GetUserId();
+
+            var query = context.Stories.AsQueryable();
+
+            switch (storyFilter)
+            {
+                case StoryFilter.All:
+                    query = query.Where(t => t.Type == StoryType.Public || t.Type == StoryType.PublicReadOnly || (t.Type == StoryType.Private && userId != null && t.Snippets.Any(s => s.UserId == userId)));
+                    break;
+                case StoryFilter.Public:
+                    query = query.Where(t => t.Type == StoryType.Public || t.Type == StoryType.PublicReadOnly);
+                    break;
+                case StoryFilter.MyStories:
+                    if (String.IsNullOrEmpty(userId))
+                    {
+                        return Unauthorized();
+                    }
+                    query = query.Where(t => t.CreatedBy == userId);
+                    break;
+                case StoryFilter.RecentlyContributed:
+                    query = query.Where(t => t.Snippets.Any(s => s.CreatedAt > DateTime.UtcNow.AddMonths(-1) && s.UserId == userId));
+                    break;
+                default:
+                    return BadRequest();
+            }
+
+            query = query.OrderByDescending(t => t.Snippets.OrderBy(s=>s.Id).Last().CreatedAt);
+
+            return await query.Select(t => new StoryDto()
             {
                 Id = t.Id,
                 CharacterLimit = t.CharacterLimit,
@@ -34,7 +64,8 @@ namespace FoldingStoryWeb.Server.Controllers
                 SnippetCount = t.Snippets.Count(),
                 TimeLimit = t.TimeLimit,
                 Title = t.Title,
-                Type = t.Type
+                Type = t.Type,
+                CreatedBy = t.CreatedBy
             }).ToListAsync();
         }
 
@@ -44,7 +75,10 @@ namespace FoldingStoryWeb.Server.Controllers
         {
             try
             {
-                var story = await _context.Stories.FindAsync(id);
+                var story = await context.Stories.FindAsync(id);
+
+                //var userId = this.GetUserId();
+                //if (story.Type == StoryType.Private && (story.CreatedBy != userId ||  ))
 
                 if (story == null)
                 {
@@ -52,7 +86,8 @@ namespace FoldingStoryWeb.Server.Controllers
                 }
 
                 return story.ToDto();
-            } catch(Exception ex)
+            }
+                catch (Exception ex)
             {
                 var a = 3;
             }
@@ -62,6 +97,7 @@ namespace FoldingStoryWeb.Server.Controllers
         // PUT: api/Stories/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
+        [Authorize]
         public async Task<IActionResult> PutStory(int id, StoryDto story)
         {
             if (id != story.Id)
@@ -69,13 +105,13 @@ namespace FoldingStoryWeb.Server.Controllers
                 return BadRequest();
             }
 
-            var dbStory = await _context.Stories.FirstOrDefaultAsync(t => t.Id == id);
+            var dbStory = await context.Stories.FirstOrDefaultAsync(t => t.Id == id);
             //_context.Entry(story).State = EntityState.Modified;
             dbStory.FromDto(story);
 
             try
             {
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -95,36 +131,40 @@ namespace FoldingStoryWeb.Server.Controllers
         // POST: api/Stories
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Story>> PostStory(StoryDto story)
+        [Authorize]
+        public async Task<ActionResult<StoryDto>> PostStory(StoryDto story)
         {
             var dbStory = new Story();
             dbStory.FromDto(story);
             dbStory.CreatedAt = DateTime.UtcNow;
-            _context.Stories.Add(dbStory);
-            var result = await _context.SaveChangesAsync();
+            dbStory.CreatedBy = this.GetUserId();
+            context.Stories.Add(dbStory);
+            var result = await context.SaveChangesAsync();
 
-            return CreatedAtAction("GetStory", new { id = dbStory.Id }, dbStory.ToDto());
+            return dbStory.ToDto();
+            //return CreatedAtAction("GetStory", new { id = dbStory.Id }, dbStory.ToDto());
         }
 
         // DELETE: api/Stories/5
         [HttpDelete("{id}")]
+        [Authorize]
         public async Task<IActionResult> DeleteStory(int id)
         {
-            var story = await _context.Stories.FindAsync(id);
+            var story = await context.Stories.FindAsync(id);
             if (story == null)
             {
                 return NotFound();
             }
 
-            _context.Stories.Remove(story);
-            await _context.SaveChangesAsync();
+            context.Stories.Remove(story);
+            await context.SaveChangesAsync();
 
             return NoContent();
         }
 
         private bool StoryExists(int id)
         {
-            return _context.Stories.Any(e => e.Id == id);
+            return context.Stories.Any(e => e.Id == id);
         }
     }
 }

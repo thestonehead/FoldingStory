@@ -1,6 +1,9 @@
 ﻿@page "/"
+@page "/{FilterType}"
 @using FoldingStoryWeb.Shared
 @using FoldingStoryWeb.Client.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+
 @inject HttpClient Http
 
 <PageTitle>Folding stories</PageTitle>
@@ -14,23 +17,112 @@
 </div>
 
 <div class="container border shading storiesPanel padding-small">
+    <AuthorizeView>
+        <Authorized>
+            <ul class="breadcrumb border">
+                <li>
+                    @if (storyFilter == StoryFilter.Public)
+                    {
+                        @:Public stories
+                    }
+                    else
+                    {
+                        <NavLink href="/Public">Public stories</NavLink>
+                    }
+                </li>
+                <li>
+                    @if (storyFilter == StoryFilter.MyStories)
+                    {
+                        @:My stories
+                    }
+                    else
+                    {
+                        <NavLink href="/MyStories">My stories</NavLink>
+                    }
+                </li>
+                <li>
+                    @if (storyFilter == StoryFilter.RecentlyContributed)
+                    {
+                        @:Recently contributed
+                    }
+                    else
+                    {
+                        <NavLink href="/RecentlyContributed">Recently contributed</NavLink>
+                    }
+                </li>
+            </ul>
+        </Authorized>
+    </AuthorizeView>
     <div style="text-align: center"><h3>Read a story</h3></div>
-    @foreach (var story in stories)
-    {
-        <StoryCard Story="@story" />
 
+    @if (loadingStories)
+    {
+        <img class="loader" src="/loading.png" />
+    }
+    else
+    {
+        if (!stories.Any())
+        {
+            @:There seems to be nothing here. Try contributing to a story or create your own!
+        }
+        @foreach (var story in stories)
+        {
+            <StoryCard Story="@story" />
+        }
     }
 </div>
+@*
+    <AuthorizeView>
+    <Authorized>
+
+    <div class="container border shading storiesPanel padding-small">
+    <div style="text-align: center"><h3>Your stories</h3></div>
+    @foreach (var story in stories)
+    {
+    <StoryCard Story="@story" />
+    }
+    </div>
+
+    </Authorized>
+    </AuthorizeView>
+*@
 
 
 @code {
+    [Parameter]
+    public string? FilterType { get; set; }
+    private StoryFilter storyFilter = StoryFilter.Public;
+
     private IEnumerable<StoryDto> stories = new StoryDto[0];
+    private bool loadingStories = true;
+
+    [CascadingParameter] private Task<AuthenticationState> authenticationStateTask { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        stories = await Http.GetFromJsonAsync<IEnumerable<StoryDto>>("/api/stories") ?? new StoryDto[0];
 
+    }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        var anotherauthstate = await authenticationStateTask;
+
+        if (Enum.TryParse<StoryFilter>(FilterType, out StoryFilter result))
+        {
+            storyFilter = result;
+        }
+        else
+        {
+            storyFilter = StoryFilter.Public;
+        }
+
+        if (storyFilter == StoryFilter.Public || anotherauthstate.User.Identity.IsAuthenticated)
+        {
+            loadingStories = true;
+            stories = await Http.GetFromJsonAsync<IEnumerable<StoryDto>>("/api/stories?storyFilter=" + storyFilter) ?? new StoryDto[0];
+            loadingStories = false;
+        }
+        StateHasChanged();
     }
 }
 
@@ -42,5 +134,14 @@
     .storiesPanel {
         margin-top: 10px;
         padding: 10px;
+    }
+
+    .breadcrumb {
+        text-align: center;
+    }
+
+    .loader {
+        margin: auto;
+        border: none;
     }
 </style>

@@ -1,30 +1,31 @@
 ﻿@page "/newStory"
 @using FoldingStoryWeb.Shared
 @using Microsoft.AspNetCore.Components.Authorization
+@inject IJSRuntime JS
 @inject HttpClient Http
 @inject NavigationManager Navigation
 <h3>Start a new story</h3>
 
-<div class="container shadow border">
+<div class="container shadow border newStoryPanel">
     <EditForm class="form" Model="@story" OnValidSubmit="OnValidSubmit">
         <div class="form-group">
             <label for="title">Title:</label>
-            <input type="text" placeholder="An interesting title" id="title" @bind-value="story.Title" />
+            <input type="text" placeholder="An interesting title" id="title" @bind-value="story.Title" class="col-6 input-block"/>
         </div>
         <div class="form-group">
-            <label for="characterLimit" class="paper-check">
-                <input type="checkbox" name="characterLimit" id="characterLimitOn" value="1"> <span>Character limit:</span>
+            <label for="characterLimit" class="paper-check" popover-right="Limits are 142 - 1800 characters including spaces to keep the snippets short, but constructive.">
+                @*<input type="checkbox" name="characterLimit" id="characterLimitOn" value="1">*@ <span>Character limit:</span>
             </label>
             <InputNumber @bind-Value="story.CharacterLimit" id="characterLimit" max="1800" min="142" />
         </div>
         <div class="form-group">
-            <label for="sequenceLimit" class="paper-check">
-                <input type="checkbox" name="sequenceLimit" id="sequenceLimitOn" value="1"> <span>Sequence limit:</span>
+            <label for="sequenceLimit" class="paper-check" popover-right="Limits are 1 - 10 snippets between contributions by the same author to keep things varied but active.">
+                @*<input type="checkbox" name="sequenceLimit" id="sequenceLimitOn" value="1">*@ <span>Sequence limit:</span>
             </label>
             <InputNumber @bind-Value="story.SequenceLimit" id="sequenceLimit" max="10" min="1" />
         </div>
         <div class="form-group">
-            <label for="type">Select availability:</label>
+            <label for="type" popover-right="Public - everybody can read/write;<br/>Private - only people with direct link can read/write;<br/>PublicReadOnly - everybody can read, only people with direct link can write.">Select availability:</label>
             <InputSelect @bind-Value="story.Type">
                 @foreach (var item in Enum.GetValues<StoryType>())
                 {
@@ -56,13 +57,13 @@
     [CascadingParameter] private Task<AuthenticationState> authenticationStateTask { get; set; }
 
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
         story.CharacterLimit = 1800;
         story.SequenceLimit = 1;
         story.Type = StoryType.Public;
 
-        return base.OnInitializedAsync();
+        await JS.InvokeVoidAsync("SetupCharacterCount");
     }
 
     private async Task OnValidSubmit()
@@ -95,6 +96,21 @@
         var anotherauthstate = await authenticationStateTask;
         username = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.Name)?.Value;
         userId = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        story.CreatedBy = userId;
         StateHasChanged();
     }
 }
+
+
+<style type="text/css">
+    .newStoryPanel {
+        padding: 10px;
+    }
+
+    textarea {
+        width: 100%;
+        height: 200px;
+    }
+
+</style>

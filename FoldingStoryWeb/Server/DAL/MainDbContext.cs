@@ -10,6 +10,7 @@ namespace FoldingStoryWeb.Server.DAL
 
         public DbSet<Story> Stories { get; set; }
         public DbSet<Snippet> Snippets { get; set; }
+        public DbSet<GeneratedLink> Links { get; set; }
 
         public MainDbContext(DbContextOptions options) : base(options)
         {
@@ -27,6 +28,13 @@ namespace FoldingStoryWeb.Server.DAL
                 build.ToTable("Story");
                 build.Property(t => t.Type).HasConversion<int>();
             });
+            modelBuilder.Entity<GeneratedLink>(build =>
+            {
+                build.ToTable("GeneratedLink");
+                build.HasKey(nameof(GeneratedLink.Id));
+                build.HasOne<Story>().WithMany().HasForeignKey(g => g.StoryId);
+                //build.HasOne<Snippet>().WithMany().HasForeignKey(g => g.SnippetId);
+            });
         }
 
         
@@ -42,6 +50,7 @@ namespace FoldingStoryWeb.Server.DAL
         public TimeSpan? TimeLimit { get; set; }
         public int? SequenceLimit { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string CreatedBy { get; set; }
         public StoryType Type { get; set; }
 
         public virtual ICollection<Snippet> Snippets { get; set; }
@@ -60,6 +69,8 @@ namespace FoldingStoryWeb.Server.DAL
             dto.SequenceLimit = SequenceLimit;
             dto.CharacterLimit = CharacterLimit;
             dto.SnippetCount = this.Snippets.Count();
+            dto.CreatedBy = this.CreatedBy;
+            dto.Type = this.Type;
             return dto;
         }
 
@@ -110,5 +121,15 @@ namespace FoldingStoryWeb.Server.DAL
             this.Username = dto.Username;
             return this;
         }
+    }
+
+    public class GeneratedLink
+    {
+        public string Id { get; set; }
+        public DateTime? ValidTo { get; set; }
+        public int StoryId { get; set; }
+        public int? SnippetId { get; set; }
+        public string GeneratedBy { get; set; }
+        public DateTime GeneratedOn { get; set; }
     }
 }

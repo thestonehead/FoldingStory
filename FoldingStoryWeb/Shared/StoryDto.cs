@@ -16,6 +16,7 @@ namespace FoldingStoryWeb.Shared
         public int? SequenceLimit { get; set; }
         public StoryType Type { get; set; }
         public int SnippetCount { get; set; }
+        public string CreatedBy { get; set; }
     }
 
     public enum StoryType

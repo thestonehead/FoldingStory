@@ -10,6 +10,9 @@
     <link href="css/app.css" rel="stylesheet" />
     <link href="FoldingStoryWeb.Client.styles.css" rel="stylesheet" />
     <link href="https://unpkg.com/papercss@1.8.3/dist/paper.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+
+
 
 
     <script type="text/javascript">
@@ -23,11 +26,35 @@
                 });
             }
         }
+
+        var navBarHandler = function (window) {
+            if ((window).innerWidth <= 852) {
+                document.querySelector("nav input[type=checkbox]").removeAttribute('checked');
+            }
+            else {
+                let newEl = document.createElement("input");
+                newEl.setAttribute("id", "collapsible1");
+                newEl.setAttribute("type", "checkbox");
+                newEl.setAttribute("name", "collapsible");
+                //newEl.setAttribute("checked","");
+                var oldEl = document.querySelector("nav input[type=checkbox]")
+                if (oldEl)
+                    oldEl.replaceWith(newEl);
+            }
+        };
+
+        window.addEventListener("load", navBarHandler);
+        window.addEventListener("resize", navBarHandler);
     </script>
 </head>
 
 <body>
-    <div id="app">Loading...</div>
+    <div id="app">
+        <div class="loaderContainer" style="width:100%; text-align:center; margin-top:25%;">
+            <img class="loader" src="/loading.png" style="margin:auto;border:none;" />
+            <div>Looking up stories...</div>
+        </div>
+    </div>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.

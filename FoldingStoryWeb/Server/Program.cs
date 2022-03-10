@@ -1,4 +1,5 @@
 using FoldingStoryWeb.Server.DAL;
+using FoldingStoryWeb.Server.Infrastructure;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.ResponseCompression;
@@ -12,7 +13,8 @@ var configuration = builder.Configuration;
 builder.Services.AddDbContext<MainDbContext>(options =>
 {
     //options.UseInMemoryDatabase("TempDb");
-    options.UseSqlite(@"Data Source=C:\Users\Frankovic\Documents\HeidiSQL\FoldingStoryDb.sqlite3;");
+    //options.UseSqlite(@"Data Source=C:\Users\Frankovic\Documents\HeidiSQL\FoldingStoryDb.sqlite3;");
+    options.UseSqlite(@"Data Source=D:\Projects\GitHub\FoldingStory\FoldingDb.sqlite3;");
 });
 
 builder.Services.AddAuthentication(
@@ -56,12 +58,13 @@ else
 app.UseAuthentication();
 app.UseHttpsRedirection();
 
+app.UseMiddleware<ErrorHandlingMiddleware>();
 
 app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
 app.UseRouting();
-
+app.UseAuthorization();
 
 app.MapRazorPages();
 app.MapControllers();

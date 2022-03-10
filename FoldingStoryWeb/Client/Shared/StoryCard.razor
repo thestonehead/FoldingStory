@@ -1,14 +1,39 @@
 ﻿@namespace FoldingStoryWeb.Client.Shared
 @using FoldingStoryWeb.Shared;
 @using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
+@inject NavigationManager NavigationManager
 
-<div class="card storyCard border">
+<div class="card storyCard border" @onclick="CardClicked">
     <div class="card-header">
-        <a class="nav-link" href="@("/story/" + CodeHelper.IntToString(Story.Id.Value))">
+        <a class="nav-link" href="@storyLink">
             @Story.Title
         </a>
-        <span class="float-right">@Story.SnippetCount snippets</span>
+
+        @if (Story.Type == StoryType.Public)
+        {
+            <span class="float-right" popover-bottom="Public - can read and contribute">
+                <i class="bi bi-eye"></i>
+            </span>
+        }
+        else if (Story.Type == StoryType.PublicReadOnly)
+        {
+            <span class="float-right" popover-bottom="ReadOnly - can read but can't contribute">
+                <i class="bi bi-lock"></i>
+            </span>
+        }
+        else
+        {
+            <span class="float-right" popover-bottom="Private - only seen via direct link">
+                <i class="bi bi-eye-slash-fill"></i>
+            </span>
+        }
+
+        <span class="float-right" popover-bottom="Sequence limit">@Story.SequenceLimit <i class="bi bi-distribute-vertical"></i></span>
+        <span class="float-right" popover-bottom="Character limit">@Story.CharacterLimit <i class="bi bi-card-text"></i></span>
+        <span class="float-right" popover-bottom="Number typeof snippets">@Story.SnippetCount <i class="bi bi-card-list"></i></span>
+
     </div>
     <div class="card-body">
         @if (firstSnippet != null)
@@ -28,9 +53,39 @@
 
     private SnippetDto? firstSnippet;
 
+    [CascadingParameter] private Task<AuthenticationState> authenticationStateTask { get; set; }
+    private string? username;
+    private string? userId;
+
+    private string storyLink = "#";
+
     protected override async Task OnInitializedAsync()
     {
         firstSnippet = (await Http.GetFromJsonAsync<IEnumerable<SnippetDto>>($"/api/snippets/byStory/{Story.Id}?head=1"))?.FirstOrDefault();
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var anotherauthstate = await authenticationStateTask;
+        username = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.Name)?.Value;
+        userId = anotherauthstate.User.Claims.FirstOrDefault(t => t.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (Story != null && Story.Id.HasValue && (Story.Type == StoryType.Private || Story.Type == StoryType.PublicReadOnly) && Story.CreatedBy != userId)
+        {
+            storyLink = "/story/read/" + CodeHelper.IntToString(Story.Id.Value);
+        }
+        else if (Story != null && Story.Id.HasValue)
+        {
+            storyLink = "/story/" + CodeHelper.IntToString(Story.Id.Value);
+        }
+
+        StateHasChanged();
+    }
+
+    protected void CardClicked()
+    {
+        NavigationManager.NavigateTo(storyLink);
     }
 }
 
@@ -38,5 +93,12 @@
 <style type="text/css">
     .storyCard {
         margin-top: 10px;
+    }
+
+
+    .float-right {
+        float: right;
+        margin: 0px;
+        margin-right: 5px;
     }
 </style>
