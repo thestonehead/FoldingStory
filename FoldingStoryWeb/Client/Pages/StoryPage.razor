@@ -5,8 +5,8 @@
 @inject HttpClient Http
 @*@inject AuthenticationStateProvider authenticationStateProvider*@
 
-<h3><a href="/story/@story.Title">@story.Title</a></h3>
-@if (story.Type == StoryType.Private || story.Type == StoryType.PublicReadOnly)
+<h3><a href="/story/@story?.Title">@story?.Title</a></h3>
+@if (story?.Type == StoryType.Private || story?.Type == StoryType.PublicReadOnly)
 {
     <div>
         @if (generatedLink != null)
@@ -60,7 +60,7 @@
                 }
                 else
                 {
-                    @if (story.TimeLimit.HasValue)
+                    @if (story?.TimeLimit.HasValue == true)
                     {
                         <div class="progress">
                             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="@limitTimerProgress" aria-valuemin="0" aria-valuemax="100" style="width: 75%"></div>
@@ -69,7 +69,7 @@
 
                     <EditForm Context="newSnippetForm" OnValidSubmit="OnValidSubmit" Model="newSnippet">
                         <div><label>Your story snippet:</label></div>
-                        <InputTextArea @bind-Value="newSnippet.Text" maxlength="@story.CharacterLimit" id="newSnippetTxt" />
+                        <InputTextArea @bind-Value="newSnippet.Text" maxlength="@story?.CharacterLimit" id="newSnippetTxt" />
                         <div>
                             @*<span >@newSnippet?.Text?.Count() characters</span>*@
                             <span id="newSnippetCharCountTxt">0 </span>
